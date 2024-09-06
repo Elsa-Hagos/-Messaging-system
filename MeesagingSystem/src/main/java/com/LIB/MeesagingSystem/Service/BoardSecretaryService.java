@@ -147,6 +147,7 @@ public class BoardSecretaryService {
     public ApiResponse updateBoardSecretary(String id, BSRequest bSRequest) {
 
         Optional<BoardSecretary> boardSecretaryOptional = boardSecretaryRepo.findById(id);
+
         if (boardSecretaryOptional.isPresent()) {
             if (bSRequest.getEmail() == null || !EMAIL_PATTERN.matcher(bSRequest.getEmail()).matches()) {
                 return new ApiResponse("Error", "Invalid email format.");}
@@ -158,6 +159,7 @@ public class BoardSecretaryService {
             updatedBoardSecretary.setId(existingBoardSecretary.getId());
             updatedBoardSecretary.setCreatedDate(createdDate);
             updatedBoardSecretary.setUpdatedDate(new Date());
+            updatedBoardSecretary.setRole(boardSecretaryOptional.get().getRole());
             boardSecretaryRepo.save(updatedBoardSecretary);
 
             return new ApiResponse("Success", "Board Secretary updated successfully.");
