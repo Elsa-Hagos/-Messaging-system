@@ -50,7 +50,10 @@ public class SecurityConfig {
     }
     @Bean
     public LdapTemplate ldapTemplate() {
-        return new LdapTemplate(contextSource());
+        LdapTemplate ldapTemplate = new LdapTemplate(contextSource());
+        ldapTemplate.setIgnoreNameNotFoundException(true);
+        return ldapTemplate;
+
     }
 
     @Bean
@@ -64,7 +67,7 @@ public class SecurityConfig {
         ldapContextSource.setUrl(url);
         ldapContextSource.setUserDn(username);
         ldapContextSource.setPassword(password);
-
+        ldapContextSource.setReferral("ignore");
 
         final Map<String, Object> envProps = new HashMap<>();
         envProps.put("java.naming.ldap.attributes.binary","objectGUID");

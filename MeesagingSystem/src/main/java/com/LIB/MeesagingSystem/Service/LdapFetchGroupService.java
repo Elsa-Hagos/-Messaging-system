@@ -10,6 +10,7 @@ import com.LIB.MeesagingSystem.Repository.GroupRepository;
 import com.LIB.MeesagingSystem.Repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.ldap.PartialResultException;
 import org.springframework.ldap.core.AttributesMapper;
 import org.springframework.ldap.core.LdapTemplate;
 import org.springframework.scheduling.annotation.Async;
@@ -44,8 +45,7 @@ public class LdapFetchGroupService {
                 log.info("Fetching groups and members from LDAP");
                 List<LdapGroup> groups = this.getAllGroups();
 
-                groups = groups.stream()
-                        .filter(group -> group.getMail() != null) // Filter groups with mail only
+                groups = groups.stream()// Filter groups with mail only
                         .peek(group -> {
                             if (group.getManagedBy() != null) {
                                 group.setManagedBy(this.searchByFirstName(group.getManagedBy()).getDisplayName());
@@ -167,44 +167,66 @@ public class LdapFetchGroupService {
     }
 
     public List<LdapGroup> getAllGroups() {
-        String searchFilter = "(&(objectClass=group)(mail=*))";
+        // Initialize the list outside the try-catch block
+        List<LdapGroup> groups = new ArrayList<>();
 
-        return ldapTemplate.search("CN=Users,DC=LIB5,DC=COM", searchFilter, (AttributesMapper<LdapGroup>) attributes -> {
-            LdapGroup group = new LdapGroup();
-            byte[] guidBytes = (byte[]) attributes.get("objectGUID").get();
-            group.setId(convertBytesToGUID(guidBytes));
+        try {
+            String searchFilter = "(&(objectClass=group)(member=*))";
 
-            // Check and set 'cn'
-            if (attributes.get("cn") != null) {
-                group.setCn(attributes.get("cn").get().toString());
-            }
+            ldapTemplate.setIgnorePartialResultException(true);  // Ignore continuation references
 
-            if (attributes.get("description") != null) {
-                group.setDescription(attributes.get("description").get().toString());
-            }
+            // Perform the LDAP search and add results to the groups list
+            groups = ldapTemplate.search("DC=LIB5,DC=COM", searchFilter, (AttributesMapper<LdapGroup>) attributes -> {
+                if(attributes.get("cn").toString()==("Microsoft Exchange Security Groups") || attributes.get("cn").toString().equals("ForeignSecurityPrincipals"))
+                    return LdapGroup.builder().build();
+                 LdapGroup group = new LdapGroup();
+                byte[] guidBytes = (byte[]) attributes.get("objectGUID").get();
+                group.setId(convertBytesToGUID(guidBytes));
 
-            // Check and set 'mail'
-            group.setMail(attributes.get("mail") != null ? attributes.get("mail").get().toString() : null);
+                // Set 'cn'
+                group.setCn(attributes.get("cn") != null ? attributes.get("cn").get().toString() : null);
 
-            // Check and set 'managedBy'
-            group.setManagedBy(attributes.get("managedBy") != null ? attributes.get("managedBy").get().toString() : null);
+                // Set 'description'
+                group.setDescription(attributes.get("description") != null ? attributes.get("description").get().toString() : null);
 
-            group.setManager(searchByFirstNameForManagers(group.getManagedBy()));
-            // Handling multiple 'member' values
-            if (attributes.get("member") != null) {
-                NamingEnumeration<?> members = attributes.get("member").getAll();
-                List<String> memberList = new ArrayList<>();
-                while (members.hasMore()) {
-                    memberList.add(members.next().toString());
+                // Set 'mail'
+                group.setMail(attributes.get("mail") != null ? attributes.get("mail").get().toString() : null);
+
+                // Set 'managedBy' and search manager details
+                group.setManagedBy(attributes.get("managedBy") != null ? attributes.get("managedBy").get().toString() : null);
+                group.setManager(searchByFirstNameForManagers(group.getManagedBy()));
+
+                // Handling multiple 'member' values
+                if (attributes.get("member") != null) {
+                    NamingEnumeration<?> members = attributes.get("member").getAll();
+                    List<String> memberList = new ArrayList<>();
+                    while (members.hasMore()) {
+                        memberList.add(members.next().toString());
+                    }
+                    group.setMembersName(memberList);
+                } else {
+                    group.setMembers(null);
                 }
-                group.setMembersName(memberList);
-            } else {
-                group.setMembers(null);
-            }
 
-            return group;
-        });
+                return group;
+            });
+        } catch (PartialResultException e) {
+            String remainingName = e.getRemainingName().toString();
+            log.warn("PartialResultException: Unprocessed Continuation Reference(s): {}", e.getMessage());
+
+            // Check if remaining name is 'DC=LIB5,DC=COM' and stop iteration if so
+            if ("DC=LIB5,DC=COM".equals(remainingName)) {
+                log.warn("Stopping iteration due to remaining name: {}", remainingName);
+            }
+            // Handle the exception but return the accumulated results so far
+        } catch (Exception e) {
+            log.error("An error occurred during LDAP search: {}", e.getMessage());
+        }
+
+        // Return the accumulated groups, even if an exception occurs
+        return groups;
     }
+
 
 
     public LdapUser searchByFirstName(String dn) {
@@ -212,6 +234,9 @@ public class LdapFetchGroupService {
             return new LdapUser();
         if (dn.equals("CN=Desta G\\\\tsadikan,OU=adihki users,OU=Adihaki Branch,OU=Northern Outline Branches,OU=LIB Users & Computers,DC=LIB5,DC=COM"))
             return new LdapUser();
+        if(dn.equals("CN=Exchange Servers,OU=Microsoft Exchange Security Groups,DC=LIB5,DC=COM"))
+            return new LdapUser();
+
 
         try {
             return ldapTemplate.lookup(escapeDn(dn), (AttributesMapper<LdapUser>) attrs -> {
@@ -220,11 +245,12 @@ public class LdapFetchGroupService {
                     byte[] guidBytes = (byte[]) attrs.get("objectGUID").get();
                     user.setId(convertBytesToGUID(guidBytes));
                     user.setCn(attrs.get("cn") != null ? attrs.get("cn").get().toString() : null);
-                    user.setMail(attrs.get("userPrincipalName") != null ? attrs.get("userPrincipalName").get().toString() : null);
-                    user.setDisplayName(attrs.get("displayName") != null ? attrs.get("displayName").get().toString() : null);
+                    user.setMail(attrs.get("userPrincipalName") != null ? attrs.get("userPrincipalName").get().toString().toLowerCase() : null);
+                    user.setDisplayName(user.getCn());
                     return user;
                 }
-                return null;
+                log.info(dn);
+                return new LdapUser();
             });
         } catch (Exception e) {
             log.error("Error retrieving LDAP user for dn: {} - {}", dn, e.getMessage());
@@ -233,13 +259,14 @@ public class LdapFetchGroupService {
     }
 
     public LdapUser searchByFirstNameForManagers(String dn) {
-        log.info(dn + " is searching for managers");
+        log.warn(dn + " is searching for managers");
         if (dn == null)
             return null;
         if (dn.equals("CN=admin,OU=ITS Users,OU=IT,DC=LIB5,DC=COM"))
             return null;
         if (dn.equals("CN=Desta G\\\\tsadikan,OU=adihki users,OU=Adihaki Branch,OU=Northern Outline Branches,OU=LIB Users & Computers,DC=LIB5,DC=COM"))
             return null;
+
 
         try {
             return ldapTemplate.lookup(escapeDn(dn), (AttributesMapper<LdapUser>) attrs -> {
@@ -248,10 +275,11 @@ public class LdapFetchGroupService {
                     byte[] guidBytes = (byte[]) attrs.get("objectGUID").get();
                     user.setId(convertBytesToGUID(guidBytes));
                     user.setCn(attrs.get("cn") != null ? attrs.get("cn").get().toString() : null);
-                    user.setMail(attrs.get("userPrincipalName") != null ? attrs.get("userPrincipalName").get().toString() : null);
-                    user.setDisplayName(attrs.get("displayName") != null ? attrs.get("displayName").get().toString() : null);
+                    user.setMail(attrs.get("userPrincipalName") != null ? attrs.get("userPrincipalName").get().toString().toLowerCase() : null);
+                    user.setDisplayName(user.getCn());
                     return user;
                 }
+                log.warn(dn);
                 return null;
             });
         } catch (Exception e) {
@@ -297,6 +325,10 @@ public class LdapFetchGroupService {
     }
 
     public String escapeDn(String dn) {
-        return dn.replace("/", "\\/");
+        return dn
+                .replace("\\", "\\\\")  // Escape backslashes
+                .replace("/", "\\/")    // Escape forward slashes
+                .replace("'", "\\'");   // Escape single quotes
     }
+
 }

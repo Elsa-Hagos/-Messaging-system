@@ -22,6 +22,7 @@ import org.springframework.security.core.AuthenticationException;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
+import org.springframework.security.ldap.userdetails.LdapUserDetails;
 import org.springframework.security.web.authentication.AbstractAuthenticationProcessingFilter;
 import org.springframework.stereotype.Component;
 
@@ -75,7 +76,8 @@ public class AuthenticationFilter extends AbstractAuthenticationProcessingFilter
                                             FilterChain chain, Authentication authResult) throws IOException {
         SecurityContextHolder.getContext().setAuthentication(authResult);
         UserDetails userDetails = (UserDetails) authResult.getPrincipal();
-        LdapUserDTO user = getUserObjectGUIDByEmail(userDetails.getUsername());
+        LdapUserDetails ldapUserDetails = (LdapUserDetails) authResult.getPrincipal();
+        LdapUserDTO user = searchByDn(ldapUserDetails.getDn());
         usersService.saveUsers(user.getEmail(),user.getName(),user.getUid());
         var jwtToken = jwtService.generateToken(userDetails, user);
         response.setContentType("application/json");
@@ -123,22 +125,22 @@ public class AuthenticationFilter extends AbstractAuthenticationProcessingFilter
     }
 
 
-    public LdapUserDTO getUserObjectGUIDByEmail(String email) {
-        EqualsFilter filter = new EqualsFilter("userPrincipalName", email);
-
-        List<LdapUserDTO> users = ldapTemplate.search(searchBase, filter.encode(), new AttributesMapper<LdapUserDTO>() {
-            @Override
-            public LdapUserDTO mapFromAttributes(Attributes attributes) throws NamingException {
-                byte[] objectGuidBytes = (byte[]) attributes.get("objectGUID").get();
-                String objectGUID = convertBytesToGUID(objectGuidBytes);
-                String username = (String) attributes.get("cn").get();
-                return LdapUserDTO.builder().email(email).name(username).uid(objectGUID).build();
-            }
-        });
-
-        // Assuming only one result should match the email
-        return users.isEmpty() ? null : users.get(0);
-    }
+//    public LdapUserDTO getUserObjectGUIDByEmail(String email) {
+//        EqualsFilter filter = new EqualsFilter("userPrincipalName", email);
+//
+//        List<LdapUserDTO> users = ldapTemplate.search(searchBase, filter.encode(), new AttributesMapper<LdapUserDTO>() {
+//            @Override
+//            public LdapUserDTO mapFromAttributes(Attributes attributes) throws NamingException {
+//                byte[] objectGuidBytes = (byte[]) attributes.get("objectGUID").get();
+//                String objectGUID = convertBytesToGUID(objectGuidBytes);
+//                String username = (String) attributes.get("cn").get();
+//                return LdapUserDTO.builder().email(email).name(username).uid(objectGUID).build();
+//            }
+//        });
+//
+//        // Assuming only one result should match the email
+//        return users.isEmpty() ? null : users.get(0);
+//    }
 
     private String convertBytesToGUID(byte[] guidBytes) {
         UUID uuid = UUID.fromString(
@@ -168,6 +170,28 @@ public class AuthenticationFilter extends AbstractAuthenticationProcessingFilter
         return (boardSecretaryService.externalUserLogin(email, password)) ;
 
 
+    }
+
+    public LdapUserDTO searchByDn(String dn) {
+
+        try {
+            return ldapTemplate.lookup(escapeDn(dn), (AttributesMapper<LdapUserDTO>) attrs -> {
+                LdapUserDTO user = new LdapUserDTO();
+                byte[] guidBytes = (byte[]) attrs.get("objectGUID").get();
+                user.setUid(convertBytesToGUID(guidBytes));
+                user.setEmail(attrs.get("userPrincipalName") != null ? attrs.get("userPrincipalName").get().toString() : null);
+                user.setName(attrs.get("displayName") != null ? attrs.get("displayName").get().toString() : null);
+                return user;
+            });
+        } catch (Exception e) {
+            log.error("Error retrieving LDAP user for dn: {} - {}", dn, e.getMessage());
+            return null;
+        }
+    }
+
+
+    public String escapeDn(String dn) {
+        return dn.replace("/", "\\/");
     }
 
 
