@@ -16,6 +16,9 @@ public interface BoardSecretaryRepo extends MongoRepository<BoardSecretary, Stri
 
     @Query("{ 'email': ?0, 'isActive': ?1 }")
     Optional<BoardSecretary> findByEmailAndIsActive(String email, boolean isActive);
+
+    @Query("{ '_id': ?0, 'isActive': ?1 }")
+    Optional<BoardSecretary> findByIdAndIsActive(String id, boolean isActive);
     
     Optional<BoardSecretary> findByFirstNameAndMiddleNameAndLastName(String firstName, String middleName, String lastName);
     Optional<BoardSecretary> findIDByEmail(String from);

@@ -1,8 +1,10 @@
 package com.LIB.MeesagingSystem.Config;
 
+import com.LIB.MeesagingSystem.Model.BoardSecretary;
 import com.LIB.MeesagingSystem.Service.BoardSecretaryService;
 import com.LIB.MeesagingSystem.Service.Impl.JwtService;
 import com.LIB.MeesagingSystem.Service.Impl.UsersService;
+import com.LIB.MeesagingSystem.enums.Role;
 import com.LIB.MeesagingSystem.filters.AuthenticationFilter;
 import com.LIB.MeesagingSystem.filters.JwtAuthenticationFilter;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -23,6 +25,7 @@ import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 
+import java.util.Date;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -72,7 +75,6 @@ public class SecurityConfig {
         final Map<String, Object> envProps = new HashMap<>();
         envProps.put("java.naming.ldap.attributes.binary","objectGUID");
         ldapContextSource.setBaseEnvironmentProperties(envProps);
-
         return ldapContextSource;
     }
 
@@ -114,8 +116,28 @@ public class SecurityConfig {
 
     @Bean
     public AuthenticationFilter authenticationFilter(AuthenticationManager authenticationManager){
+        createDefaultUser();
         return new AuthenticationFilter(authenticationManager,ldapTemplate(), getJwtService(),usersService,baseSearch,objectMapper(),boardSecretaryService);
     }
 
+
+    public void createDefaultUser() {
+        BoardSecretary boardSecretary = boardSecretaryService.getExternalUser("BSd9b0f7a2e67151d65d6bfa");
+        if(boardSecretary==null)
+        {
+            boardSecretary = new BoardSecretary();
+            boardSecretary.setId("BSd9b0f7a2e67151d65d6bfa");
+            boardSecretary.setRole(Role.BOARD_SECRETARY_ADMIN);
+            boardSecretary.setCreatedDate(new Date());
+            boardSecretary.setUpdatedDate(new Date());
+            boardSecretary.setActive(true);
+            boardSecretary.setFirstName("admin");
+            boardSecretary.setMiddleName("admin");
+            boardSecretary.setLastName("anbesabank");
+            boardSecretary.setPassword("$2a$12$WZu8TqeZkYmsg3ex77IoYuFWYesBh.UMHGGRQ52PLim29soPoNj8S");
+            boardSecretary.setEmail("board.secritary.admin@anbesabank.com");
+            boardSecretaryService.saveAdminBoardSecretary(boardSecretary);
+        }
+    }
 
 }
