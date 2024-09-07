@@ -54,7 +54,6 @@ public class BoardSecretaryService {
         if (bsRequest.getMobile() == null || !PHONE_PATTERN.matcher(bsRequest.getMobile()).matches()) {
             return new ApiResponse("Error", "Invalid phone number.");
         }
-
         loadExistingCombinations();
         String combinationKey = bsRequest.getFirstName() + ":" + bsRequest.getMiddleName() + ":" + bsRequest.getLastName();
         if (combinations.contains(combinationKey)) {
@@ -82,10 +81,8 @@ public class BoardSecretaryService {
         boardSecretary.setPassword(encodedPassword);
         boardSecretary.setGroupID(bsRequest.getGroupID());
         boardSecretary.setActive(bsRequest.isActive());
-
         boardSecretary.setCreatedDate(new Date());
         boardSecretary.setUpdatedDate(new Date());
-
         return boardSecretary;
     }
 
@@ -100,7 +97,6 @@ public class BoardSecretaryService {
 
 
     public ApiResponse updateBoardSecretary(String id, BSRequest bSRequest) {
-
         Optional<BoardSecretary> boardSecretaryOptional = boardSecretaryRepo.findById(id);
         if (boardSecretaryOptional.isPresent()) {
             if (bSRequest.getEmail() == null || !EMAIL_PATTERN.matcher(bSRequest.getEmail()).matches()) {
@@ -114,7 +110,6 @@ public class BoardSecretaryService {
             updatedBoardSecretary.setCreatedDate(createdDate);
             updatedBoardSecretary.setUpdatedDate(new Date());
             boardSecretaryRepo.save(updatedBoardSecretary);
-
             return new ApiResponse("Success", "Board Secretary updated successfully.");
         } else {
             return new ApiResponse("Error", "Board Secretary not found.");
