@@ -19,6 +19,7 @@ public class UsersService {
     }
 
     public void saveUsers(String username, String name, String id){
+        username=username.toLowerCase();
         Users users = usersRepository.findByEmail(username).orElse(null);
         if(users == null){
             Users user = Users.builder().id(id).email(username).isActive(true).name(name).build();

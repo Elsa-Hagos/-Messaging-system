@@ -33,6 +33,16 @@ public class BoardSecretaryController {
                 .map(ResponseEntity::ok)
                 .orElse(ResponseEntity.notFound().build());
     }
+
+
+    @GetMapping("/{id}")
+    public ResponseEntity<ApiResponse> getBoardSecretaryByName(@PathVariable("id") String id) {
+        ApiResponse apiResponse = boardSecretaryService.getExternalUsersById(id);
+        if ("Error".equals(apiResponse.getStatus())) {
+            return ResponseEntity.badRequest().body(apiResponse);
+        }
+        return ResponseEntity.status(HttpStatus.OK).body(apiResponse);
+    }
     @PostMapping("/create-board-secretary")
     public ResponseEntity<ApiResponse> createBoardSecretary(@RequestBody BSRequest bsRequest) {
         ApiResponse response = boardSecretaryService.createBoardSecretary(bsRequest);

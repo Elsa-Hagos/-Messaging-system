@@ -1,6 +1,7 @@
 package com.LIB.MeesagingSystem.Dto;
 
 
+import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 

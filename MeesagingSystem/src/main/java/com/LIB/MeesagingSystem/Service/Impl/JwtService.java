@@ -36,7 +36,7 @@ public class JwtService {
     }
 
     public String generateToken(UserDetails userDetails, LdapUserDTO ldapUserDTO) {
-        return generateToken(Map.of("uid",ldapUserDTO.getUid(),"name",ldapUserDTO.getName()), userDetails);
+        return generateToken(Map.of("uid",ldapUserDTO.getUid(),"name",ldapUserDTO.getName(),"role",userDetails.getAuthorities()), userDetails);
     }
 
     public String generateToken(

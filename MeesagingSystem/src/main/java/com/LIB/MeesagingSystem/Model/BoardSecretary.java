@@ -1,5 +1,6 @@
 package com.LIB.MeesagingSystem.Model;
 
+import com.LIB.MeesagingSystem.enums.Role;
 import com.fasterxml.jackson.annotation.JsonFormat;
 import jakarta.validation.constraints.NotNull;
 import lombok.AllArgsConstructor;
@@ -8,6 +9,7 @@ import lombok.NoArgsConstructor;
 import org.springframework.data.annotation.Id;
 import org.springframework.data.mongodb.core.mapping.Document;
 import org.springframework.security.core.GrantedAuthority;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.userdetails.UserDetails;
 
 
@@ -29,6 +31,7 @@ public class BoardSecretary implements UserDetails {
     @NotNull
     private String middleName;
     private String lastName;
+    private Role role;
     @NotNull
     private String password;
     @NotNull
@@ -42,7 +45,7 @@ private Date createdDate;
 private Date  updatedDate;
     @Override
     public Collection<? extends GrantedAuthority> getAuthorities() {
-        return List.of();
+        return List.of(new SimpleGrantedAuthority(role.name()));
     }
 
     @Override
