@@ -50,12 +50,20 @@ public class BODGroupController {
 
 
 
-
     @PutMapping("/update/{id}")
-    public ResponseEntity<BODGroup> updateGroup(@PathVariable String id, @RequestBody BODGroup groupRequest) {
-        Optional<BODGroup> updatedGroup = bodGroupService.updateGroup(id, groupRequest);
-        return updatedGroup.map(ResponseEntity::ok)
-                .orElseGet(() -> new ResponseEntity<>(HttpStatus.NOT_FOUND));
+    public ResponseEntity<ApiResponse> updateGroup(@PathVariable String id, @RequestBody BODGroup groupRequest) {
+        try {
+            ApiResponse response = bodGroupService.updateGroup(id, groupRequest);
+            if ("Success".equals(response.getStatus())) {
+                return ResponseEntity.ok(response);
+            } else {
+                return ResponseEntity.status(HttpStatus.NOT_FOUND).body(response);
+            }
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(new ApiResponse("Error", e.getMessage()));
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(new ApiResponse("Error", "An unexpected error occurred."));
+        }
     }
 
 

@@ -31,5 +31,4 @@ public class BODGroup {
     private String makerId;
     private List<BODMembers> members;
 
-
 }

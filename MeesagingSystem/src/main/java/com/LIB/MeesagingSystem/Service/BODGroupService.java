@@ -1,6 +1,7 @@
 package com.LIB.MeesagingSystem.Service;
 
 
+import com.LIB.MeesagingSystem.Dto.ApiResponse;
 import com.LIB.MeesagingSystem.Dto.BODGroupRequest;
 import com.LIB.MeesagingSystem.Model.BODGroup;
 import com.LIB.MeesagingSystem.Model.BODMembers;
@@ -54,20 +55,50 @@ public class BODGroupService {
      *         or HTTP status 404 Not Found if the group does not exist.
      */
 
-    public Optional<BODGroup> updateGroup(String id, BODGroup groupRequest) {
+    public ApiResponse updateGroup(String id, BODGroup groupRequest) {
         Optional<BODGroup> existingGroup = bodGroupRepository.findById(id);
         if (existingGroup.isPresent()) {
             BODGroup group = existingGroup.get();
             group.setGroupName(groupRequest.getGroupName());
+            group.setMakerId(groupRequest.getMakerId());
             group.setUpdatedDate(new Date());
-            List<BODMembers> members = bodMembersRepository.findAllById(groupRequest.getMembers());
-            group.setMembers(members);
+            if (groupRequest.getMembers() != null && !groupRequest.getMembers().isEmpty()) {
+                List<BODMembers> existingMembers = group.getMembers();
+                List<BODMembers> newMembers = bodMembersRepository.findAllById(groupRequest.getMembers());
+                for (BODMembers newMember : newMembers) {
+                    if (!existingMembers.contains(newMember)) {
+                        existingMembers.add(newMember);
+                    }
+                }
+                group.setMembers(existingMembers);
+            }
 
             bodGroupRepository.save(group);
-            return Optional.of(group);
+            return new ApiResponse("Success", "group updated successfully.");
+
         }
-        return Optional.empty();
+        else
+        return new ApiResponse("Error", "group not found.");
     }
+
+
+//    public Optional<BODGroup> updateGroup(String id, BODGroup groupRequest) {
+//        Optional<BODGroup> existingGroup = bodGroupRepository.findById(id);
+//        if (existingGroup.isPresent()) {
+//            BODGroup group = existingGroup.get();
+//            group.setGroupName(groupRequest.getGroupName());
+//            group.setMakerId(groupRequest.getMakerId());
+//            group.setUpdatedDate(new Date());
+//            if (groupRequest.getMembers() != null && !groupRequest.getMembers().isEmpty()) {
+//                List<BODMembers> members = bodMembersRepository.findAllById(groupRequest.getMembers());
+//                group.setMembers(members);
+//            }
+//
+//            bodGroupRepository.save(group);
+//            return Optional.of(group);
+//        }
+//        return Optional.empty();
+//    }
 
     /**
      * Deletes a BOD group by its name.
